@@ -22,6 +22,7 @@ spring:
 # Flyway 自动执行 migrations（放在 resources/db/migration）
 spring.flyway:
   enabled: true
+  baseline-on-migrate: true
 
 # 应用自定义配置
 app:
