@@ -27,7 +27,7 @@ spring.flyway:
 app:
   storage:
     base-dir: ./data # 本地存储根目录
-    base-url: http://localhost:8080
+    base-url: http://47.109.41.86:8080
   jwt:
     secret: my-very-secret-jwt-key-change-me # 生产用更安全的方式
     expire-seconds: 3600

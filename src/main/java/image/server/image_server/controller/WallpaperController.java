@@ -47,7 +47,7 @@ public class WallpaperController {
     @Autowired
     private JwtUtil jwtUtil;
 
-    @Value("${app.server.base-url:http://localhost:8080}")
+    @Value("${app.server.base-url:http://47.109.41.86:8080}")
     private String serverBaseUrl;
     // 列表（分页，每页9条）
     @GetMapping
@@ -247,7 +247,7 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
         int perPage = 9;
         Page<Wallpaper> p = wallpaperService.search(q, Math.max(0, page - 1), perPage);
         List<WallpaperDto> items = p.getContent().stream().map(w ->
-                new WallpaperDto(w.getUuid(), w.getName(), "http://localhost:8080/files/" + w.getThumbPath(), w.getPaid(), w.getPriceCents())
+                new WallpaperDto(w.getUuid(), w.getName(), "http://47.109.41.86:8080/files/" + w.getThumbPath(), w.getPaid(), w.getPriceCents())
         ).collect(Collectors.toList());
         return ResponseEntity.ok(new PagedResponse<>(page, perPage, p.getTotalElements(), items));
     }
