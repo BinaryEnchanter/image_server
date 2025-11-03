@@ -1,0 +1,116 @@
+name: Build and Deploy (no-docker, root)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }}
+  SERVICE_NAME: ${{ secrets.SERVICE_NAME }}
+  SSH_HOST: ${{ secrets.SSH_HOST }}
+  SSH_PORT: ${{ secrets.SSH_PORT }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Build with Maven (package)
+        env:
+          MAVEN_OPTS: "-Xmx1g"
+        run: |
+          chmod +x mvnw
+          if [ "${{ secrets.SKIP_TESTS }}" = "true" ]; then
+            ./mvnw -B -DskipTests package
+          else
+            ./mvnw -B package
+          fi
+
+      - name: Locate built jar
+        id: jarinfo
+        run: |
+          JAR=$(ls target/*.jar | grep -v 'original' | head -n1)
+          if [ -z "$JAR" ]; then
+            echo "No jar found in target/"
+            exit 1
+          fi
+          echo "jar=$JAR" >> $GITHUB_OUTPUT
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Create remote directories (root)
+        run: |
+          ssh -o StrictHostKeyChecking=no -p ${{ env.SSH_PORT }} root@${{ env.SSH_HOST }} \
+            "mkdir -p ${REMOTE_APP_DIR}/releases ${REMOTE_APP_DIR}/shared /var/log/image_server; chmod 700 /root/.ssh || true"
+
+      - name: Upload jar to remote (release path)
+        id: upload_release
+        run: |
+          JAR="${{ steps.jarinfo.outputs.jar }}"
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          BASENAME=$(basename "$JAR")
+          REMOTE_RELEASE="${REMOTE_APP_DIR}/releases/${TIMESTAMP}_${BASENAME}"
+          scp -P ${{ env.SSH_PORT }} "$JAR" "root@${{ env.SSH_HOST }}:${REMOTE_RELEASE}"
+          echo "remote_release=${REMOTE_RELEASE}" >> $GITHUB_OUTPUT
+
+      - name: Deploy on server (symlink, restart, healthcheck)
+        id: deploy
+        run: |
+          REMOTE_RELEASE="${{ steps.upload_release.outputs.remote_release }}"
+          echo "Deploying release: ${REMOTE_RELEASE}"
+          ssh -o StrictHostKeyChecking=no -p ${{ env.SSH_PORT }} root@${{ env.SSH_HOST }} << 'EOSSH'
+            set -e
+            REMOTE_APP_DIR='${{ env.REMOTE_APP_DIR }}'
+            SERVICE_NAME='${{ env.SERVICE_NAME }}'
+            RELEASE_PATH='${REMOTE_RELEASE}'
+            # update current.jar symlink atomically
+            ln -sfn "${RELEASE_PATH}" "${REMOTE_APP_DIR}/current.jar"
+            # ensure permissions
+            chown -h root:root "${REMOTE_APP_DIR}/current.jar" || true
+            # restart service
+            systemctl daemon-reload || true
+            systemctl restart "${SERVICE_NAME}"
+            # health check (adjust endpoint/port if needed)
+            for i in 1 2 3 4 5 6 7 8 9 10; do
+              sleep 2
+              if curl -fsS --max-time 5 http://127.0.0.1:8080/actuator/health >/dev/null 2>&1; then
+                echo "Health check passed"
+                exit 0
+              fi
+              echo "Waiting for health... ($i)"
+            done
+            echo "Health check failed" >&2
+            exit 1
+EOSSH
+
+      - name: Clean old releases (keep last 5)
+        run: |
+          ssh -o StrictHostKeyChecking=no -p ${{ env.SSH_PORT }} root@${{ env.SSH_HOST }} << 'EOSSH'
+            set -e
+            APP_DIR='${{ env.REMOTE_APP_DIR }}'
+            cd "${APP_DIR}/releases"
+            ls -1t | tail -n +6 | xargs -r rm -f
+EOSSH
