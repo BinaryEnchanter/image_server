@@ -1,0 +1,38 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/wallpaperdb
+    username: postgres
+    password: MrSuper
+    driver-class-name: org.postgresql.Driver
+
+  servlet:
+    multipart:
+      max-file-size: 50MB # 单个文件最大 50MB（按需调整）
+      max-request-size: 100MB # 整个请求最大 100MB（包含其它 form fields）
+
+  jpa:
+    hibernate:
+      ddl-auto: validate # 使用 Flyway migration 初始化；开发可换为 update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+
+# Flyway 自动执行 migrations（放在 resources/db/migration）
+spring.flyway:
+  enabled: true
+
+# 应用自定义配置
+app:
+  storage:
+    base-dir: ./data # 本地存储根目录
+    base-url: http://localhost:8080
+  jwt:
+    secret: my-very-secret-jwt-key-change-me # 生产用更安全的方式
+    expire-seconds: 3600
+
+logging:
+  level:
+    root: INFO
+    wallpaper: DEBUG
