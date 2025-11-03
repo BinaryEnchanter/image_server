@@ -1,0 +1,19 @@
+# application-ci.yml - 在 CI 中使用，避免访问真实 Postgres / Flyway
+spring:
+  profiles:
+    active: ci
+
+  # 禁用 Flyway，在 CI 构建阶段不跑 migrations
+  flyway:
+    enabled: false
+
+  # 使用内存 H2，以便 Spring Boot 启动不会需要真实 DB
+  datasource:
+    url: jdbc:h2:mem:ci_db;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: none

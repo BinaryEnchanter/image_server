@@ -1,21 +1,21 @@
-name: Build and Deploy (no-docker, root)
+name: Build and Deploy (no-docker, CI profile)
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main]
   workflow_dispatch:
 
 env:
-  REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }}
-  SERVICE_NAME: ${{ secrets.SERVICE_NAME }}
+  REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }} # /opt/image_server
+  SERVICE_NAME: ${{ secrets.SERVICE_NAME }} # image_server
   SSH_HOST: ${{ secrets.SSH_HOST }}
-  SSH_PORT: ${{ secrets.SSH_PORT }}
+  SSH_PORT: ${{ secrets.SSH_PORT }} # 22
+  SSH_USER: root # 你选择用 root 登录
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,23 +35,20 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      - name: Build with Maven (package)
-        env:
-          MAVEN_OPTS: "-Xmx1g"
+      - name: Build with Maven (CI-safe profile)
         run: |
           chmod +x mvnw
-          if [ "${{ secrets.SKIP_TESTS }}" = "true" ]; then
-            ./mvnw -B -DskipTests package
-          else
-            ./mvnw -B package
-          fi
+          # 使用 ci profile（application-ci.yml），并跳过测试
+          ./mvnw -B clean package -DskipTests -Dspring.profiles.active=ci -Dflyway.skip=true
+        env:
+          MAVEN_OPTS: "-Xmx1g"
 
       - name: Locate built jar
         id: jarinfo
         run: |
-          JAR=$(ls target/*.jar | grep -v 'original' | head -n1)
+          JAR=$(ls target/*.jar | grep -v 'original' | head -n1 || true)
           if [ -z "$JAR" ]; then
-            echo "No jar found in target/"
+            echo "No jar found in target/" >&2
             exit 1
           fi
           echo "jar=$JAR" >> $GITHUB_OUTPUT
@@ -61,39 +58,36 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Create remote directories (root)
+      - name: Ensure remote dirs (root)
         run: |
           ssh -o StrictHostKeyChecking=no -p ${{ env.SSH_PORT }} root@${{ env.SSH_HOST }} \
-            "mkdir -p ${REMOTE_APP_DIR}/releases ${REMOTE_APP_DIR}/shared /var/log/image_server; chmod 700 /root/.ssh || true"
+            "mkdir -p ${REMOTE_APP_DIR}/releases ${REMOTE_APP_DIR}/shared /var/log/image_server || true"
 
       - name: Upload jar to remote (release path)
         id: upload_release
         run: |
           JAR="${{ steps.jarinfo.outputs.jar }}"
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
           BASENAME=$(basename "$JAR")
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
           REMOTE_RELEASE="${REMOTE_APP_DIR}/releases/${TIMESTAMP}_${BASENAME}"
-          scp -P ${{ env.SSH_PORT }} "$JAR" "root@${{ env.SSH_HOST }}:${REMOTE_RELEASE}"
+          scp -P ${{ env.SSH_PORT }} "$JAR" root@${{ env.SSH_HOST }}:"${REMOTE_RELEASE}"
           echo "remote_release=${REMOTE_RELEASE}" >> $GITHUB_OUTPUT
 
       - name: Deploy on server (symlink, restart, healthcheck)
-        id: deploy
         run: |
           REMOTE_RELEASE="${{ steps.upload_release.outputs.remote_release }}"
-          echo "Deploying release: ${REMOTE_RELEASE}"
+          echo "Deploying: ${REMOTE_RELEASE}"
           ssh -o StrictHostKeyChecking=no -p ${{ env.SSH_PORT }} root@${{ env.SSH_HOST }} << 'EOSSH'
             set -e
             REMOTE_APP_DIR='${{ env.REMOTE_APP_DIR }}'
             SERVICE_NAME='${{ env.SERVICE_NAME }}'
-            RELEASE_PATH='${REMOTE_RELEASE}'
-            # update current.jar symlink atomically
+            RELEASE_PATH='${{ steps.upload_release.outputs.remote_release }}'
+            # atomically update symlink current.jar -> release jar
             ln -sfn "${RELEASE_PATH}" "${REMOTE_APP_DIR}/current.jar"
-            # ensure permissions
-            chown -h root:root "${REMOTE_APP_DIR}/current.jar" || true
-            # restart service
+            # restart systemd service
             systemctl daemon-reload || true
             systemctl restart "${SERVICE_NAME}"
-            # health check (adjust endpoint/port if needed)
+            # wait for health endpoint (adjust if necessary)
             for i in 1 2 3 4 5 6 7 8 9 10; do
               sleep 2
               if curl -fsS --max-time 5 http://127.0.0.1:8080/actuator/health >/dev/null 2>&1; then
@@ -111,6 +105,6 @@ jobs:
           ssh -o StrictHostKeyChecking=no -p ${{ env.SSH_PORT }} root@${{ env.SSH_HOST }} << 'EOSSH'
             set -e
             APP_DIR='${{ env.REMOTE_APP_DIR }}'
-            cd "${APP_DIR}/releases"
-            ls -1t | tail -n +6 | xargs -r rm -f
+            cd "$APP_DIR/releases"
+            ls -1t | tail -n +6 | xargs -r rm -f || true
           EOSSH
