@@ -1,7 +1,7 @@
 -- V1 初始化 schema
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   username TEXT NOT NULL UNIQUE,
   email TEXT UNIQUE,
@@ -13,7 +13,7 @@ CREATE TABLE users (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE wallpapers (
+CREATE TABLE IF NOT EXISTS wallpapers (
   uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_uuid UUID REFERENCES users(uuid) ON DELETE SET NULL,
   name TEXT NOT NULL,
@@ -35,14 +35,14 @@ CREATE TABLE wallpapers (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE favorites (
+CREATE TABLE IF NOT EXISTS favorites (
   id BIGSERIAL PRIMARY KEY,
   user_uuid UUID REFERENCES users(uuid) ON DELETE CASCADE,
   wallpaper_uuid UUID REFERENCES wallpapers(uuid) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE purchases (
+CREATE TABLE IF NOT EXISTS purchases (
   id BIGSERIAL PRIMARY KEY,
   user_uuid UUID REFERENCES users(uuid),
   wallpaper_uuid UUID REFERENCES wallpapers(uuid),
@@ -51,7 +51,7 @@ CREATE TABLE purchases (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TABLE uploads (
+CREATE TABLE IF NOT EXISTS uploads (
   id BIGSERIAL PRIMARY KEY,
   user_uuid UUID REFERENCES users(uuid),
   wallpaper_uuid UUID,
@@ -64,5 +64,5 @@ CREATE TABLE uploads (
 );
 
 -- index for name search
-CREATE INDEX idx_wallpapers_name ON wallpapers USING gin (to_tsvector('english', name));
+CREATE INDEX IF NOT EXISTS idx_wallpapers_name ON wallpapers USING gin (to_tsvector('english', name));
 
