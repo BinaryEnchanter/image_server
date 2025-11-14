@@ -70,7 +70,10 @@ public class WallpaperController {
 
     // 示例：详情接口也返回绝对 URL
     @GetMapping("/{uuid}")
-    public ResponseEntity<?> detail(@PathVariable UUID uuid) {
+    public ResponseEntity<?> detail(@PathVariable UUID uuid, Authentication authentication) {
+        if (authentication == null)
+            return ResponseEntity.status(401).body("unauthenticated");
+        UUID userUuid = UUID.fromString(authentication.getName());
         Optional<Wallpaper> o = wallpaperService.findByUuid(uuid);
         if (o.isEmpty())
             return ResponseEntity.status(404).body("not found");
@@ -82,6 +85,7 @@ public class WallpaperController {
         String base = serverBaseUrl.replaceAll("/+$", "");
         String thumbUrl = base + "/files" + thumbPath;
 
+        boolean isFavoriteByCurUser=wallpaperService.checkfavorite(userUuid, uuid);
         Map<String, Object> resp = new HashMap<>();
         resp.put("uuid", w.getUuid());
         resp.put("owner_uuid", w.getOwnerUuid());
@@ -96,6 +100,7 @@ public class WallpaperController {
         resp.put("size", w.getSizeBytes());
         resp.put("download_count", w.getDownloadCount());
         resp.put("favorite_count", w.getFavoriteCount());
+        resp.put("favorite", isFavoriteByCurUser);
         return ResponseEntity.ok(resp);
     }
     
@@ -167,15 +172,19 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
         UUID userUuid = UUID.fromString(authentication.getName());
         Wallpaper wp = wallpaperService.findByUuid(uuid).orElseThrow(() -> new RuntimeException("not found"));
 
-        // 检查购买
-        boolean purchased = wallpaperService.hasPurchased(userUuid, uuid);
-        if (!purchased) {
-            return ResponseEntity.status(403).body("请先购买此壁纸才能下载");
+        // 检查购买或是否是上传者
+        boolean isowner=wp.getOwnerUuid().equals(userUuid);
+        if (!isowner) {
+            boolean purchased = wallpaperService.hasPurchased(userUuid, uuid);
+            if (!purchased) {
+                return ResponseEntity.status(403).body("请先购买此壁纸才能下载");
+            }
         }
+        
 
         try {
             // 增加下载次数
-            wallpaperService.handleDownload(userUuid, wp);
+            wallpaperService.handleDownload(userUuid, wp,isowner);
 
             String base = serverBaseUrl.replaceAll("/+$", "");
             String downloadUrl = base + "/files/"
@@ -198,6 +207,20 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
         UUID userUuid = UUID.fromString(jwtUtil.validateAndGetSubject(jwtToken));
         wallpaperService.favorite(userUuid, uuid);
         return ResponseEntity.ok(Map.of("ok", true));
+    }
+
+    @DeleteMapping("/{uuid}/favorite")
+    public ResponseEntity<?> unfavorite(@PathVariable UUID uuid, @RequestParam("jwt") String jwtToken) {
+        if (jwtToken == null || jwtToken.isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("error", "unauthenticated"));
+        }
+        try {
+            UUID userUuid = UUID.fromString(jwtUtil.validateAndGetSubject(jwtToken));
+            wallpaperService.unfavorite(userUuid, uuid);
+            return ResponseEntity.ok(Map.of("ok", true));
+        } catch (JwtException e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
     }
 
     // 是否已经购买

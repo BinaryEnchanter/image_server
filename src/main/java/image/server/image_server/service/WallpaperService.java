@@ -122,11 +122,11 @@ public class WallpaperService {
     }
 
     /**
-     * 下载前的权限检查：若 paid 且未购买则抛异常；成功则增加 download_count（事务）
+     * 下载前的权限检查：若 paid 且未购买且不是上传者则抛异常；成功则增加 download_count（事务）
      */
     @Transactional
-    public void handleDownload(UUID userUuid, Wallpaper wallpaper) {
-        if (wallpaper.getPaid()) {
+    public void handleDownload(UUID userUuid, Wallpaper wallpaper,boolean isowner) {
+        if (wallpaper.getPaid()&&!isowner) {
             Optional<Purchase> p = purchaseRepository.findByUserUuidAndWallpaperUuid(userUuid, wallpaper.getUuid());
             if (p.isEmpty()) {
                 throw new RuntimeException("wallpaper is paid; purchase required");
@@ -141,21 +141,55 @@ public class WallpaperService {
         return storageService.loadAsResource(logicalPath);
     }
 
+
+    /**
+     * 检查是否收藏
+     */
+    @Transactional
+    public boolean checkfavorite(UUID userUuid, UUID wallpaperUuid) {
+        return favoriteRepository.findByUserUuidAndWallpaperUuid(userUuid, wallpaperUuid).isPresent();
+
+        
+    }
+
     /**
      * 收藏（如果已收藏则无操作）
      */
     @Transactional
     public void favorite(UUID userUuid, UUID wallpaperUuid) {
-        if (favoriteRepository.findByUserUuidAndWallpaperUuid(userUuid, wallpaperUuid).isPresent()) return;
+        if (favoriteRepository.findByUserUuidAndWallpaperUuid(userUuid, wallpaperUuid).isPresent())
+            return;
         Favorite f = new Favorite();
         f.setUserUuid(userUuid);
         f.setWallpaperUuid(wallpaperUuid);
         favoriteRepository.save(f);
         // update count
         long cnt = favoriteRepository.countByWallpaperUuid(wallpaperUuid);
-        wallpaperRepository.findById(wallpaperUuid).ifPresent(w -> { w.setFavoriteCount(cnt); wallpaperRepository.save(w);});
+        wallpaperRepository.findById(wallpaperUuid).ifPresent(w -> {
+            w.setFavoriteCount(cnt);
+            wallpaperRepository.save(w);
+        });
     }
 
+    /**
+     * 取消收藏
+     */
+    @Transactional
+    public void unfavorite(UUID userUuid, UUID wallpaperUuid) {
+        // 查找是否存在收藏记录
+        Optional<Favorite> existing = favoriteRepository.findByUserUuidAndWallpaperUuid(userUuid, wallpaperUuid);
+        if (existing.isEmpty()) return; // 未收藏则忽略
+
+        // 删除收藏记录
+        favoriteRepository.delete(existing.get());
+
+        // 更新收藏次数
+        long cnt = favoriteRepository.countByWallpaperUuid(wallpaperUuid);
+        wallpaperRepository.findById(wallpaperUuid).ifPresent(w -> {
+            w.setFavoriteCount(cnt);
+            wallpaperRepository.save(w);
+        });
+    }
     /**
      * 购买（金币支付）：在事务内完成检查->扣款->写 purchases
      */
