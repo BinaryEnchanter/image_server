@@ -29,6 +29,8 @@ app:
   storage:
     base-dir: ./data # 本地存储根目录
     base-url: http://47.109.41.86:8080
+  server:
+    base-url: http://47.109.41.86:8080
   jwt:
     secret: my-very-secret-jwt-key-change-me # 生产用更安全的方式
     expire-seconds: 3600
@@ -37,3 +39,16 @@ logging:
   level:
     root: INFO
     wallpaper: DEBUG
+
+llm:
+  base-url: https://ark.cn-beijing.volces.com # 豆包示例域名
+  api-key: null # 请替换为你的 key
+  model: doubao-seed-1-6-251015
+  use-history: true
+  history-window: 20
+  system-prompt: |
+    你是“壁纸中心”的智能客服，熟悉上传/下载/购买/金币/撤回上传/账户管理与常见问题。
+  rate-limit-per-minute: 30
+
+doubao:
+  api-key: null
