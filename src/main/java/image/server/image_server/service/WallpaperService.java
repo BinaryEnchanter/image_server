@@ -3,8 +3,10 @@ package image.server.image_server.service;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Base64;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,6 +15,14 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.*;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import image.server.image_server.model.Favorite;
 import image.server.image_server.model.Purchase;
@@ -49,6 +59,18 @@ public class WallpaperService {
     @Autowired
     private StorageService storageService;
 
+    @Autowired
+    private RestTemplateBuilder restTemplateBuilder;
+
+    @Value("${app.moderation.enabled:false}")
+    private boolean moderationEnabled;
+
+    @Value("${app.moderation.check-url:}")
+    private String moderationUrl;
+
+    @Value("${app.moderation.api-key:}")
+    private String moderationApiKey;
+
     /**
      * 分页查询墙纸（公共可见）
      */
@@ -78,20 +100,24 @@ public class WallpaperService {
      */
     @Transactional
     public Wallpaper upload(UUID userUuid, MultipartFile file, String name, String tags, int price) throws IOException {
-        // 1. 写 uploads 记录
         Upload up = new Upload();
         up.setUserUuid(userUuid);
         up.setOriginalFilename(file.getOriginalFilename());
         up.setStatus("processing");
         uploadRepository.save(up);
 
-        // 2. 生成 wallpaper metadata 并保存
+        if (!reviewImage(file)) {
+            up.setStatus("failed");
+            up.setErrorMsg("rejected by moderation");
+            uploadRepository.save(up);
+            throw new IOException("图片未通过内容安全审核");
+        }
+
         Wallpaper wp = new Wallpaper();
         wp.setOwnerUuid(userUuid);
         wp.setName(name == null ? file.getOriginalFilename() : name);
         wp.setDescription("");
         wp.setTags(tags == null ? "" : tags);
-        // set a logical storage path: wallpapers/{uuid}/original.ext
         UUID id = UUID.randomUUID();
         wp.setUuid(id);
         String ext = org.apache.commons.io.FilenameUtils.getExtension(file.getOriginalFilename());
@@ -103,6 +129,7 @@ public class WallpaperService {
         wp.setSizeBytes(file.getSize());
         wp.setPaid(price > 0);
         wp.setPriceCents(price);
+        wp.setVisibility("public");
         wallpaperRepository.save(wp);
 
         // 3. store file and create thumbnail (synchronous here)
@@ -275,4 +302,35 @@ public class WallpaperService {
         return purchaseRepository.findByUserUuidAndWallpaperUuid(userUuid, wallpaperUuid).isPresent();
     }
 
+    private boolean reviewImage(MultipartFile file) {
+        if (!moderationEnabled || moderationUrl == null || moderationUrl.isBlank()) return true;
+        long size = file.getSize();
+        if (size < 5 * 1024 || size > 4 * 1024 * 1024) return false;
+        try {
+            RestTemplate rt = restTemplateBuilder.build();
+            String url = moderationUrl;
+            if (!url.contains("access_token")) {
+                if (moderationApiKey == null || moderationApiKey.isBlank()) return false;
+                url = url + (url.contains("?") ? "&" : "?") + "access_token=" + moderationApiKey;
+            }
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            headers.add(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
+            String b64 = Base64.getEncoder().encodeToString(file.getBytes());
+            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            form.add("image", b64);
+            form.add("strategyId", "1");
+            HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(form, headers);
+            ResponseEntity<String> resp = rt.postForEntity(url, entity, String.class);
+            if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) {
+                ObjectMapper om = new ObjectMapper();
+                JsonNode root = om.readTree(resp.getBody());
+                JsonNode t = root.path("conclusionType");
+                return t.isInt() && t.asInt() == 1;
+            }
+            return false;
+        } catch (Exception ex) {
+            return false;
+        }
+    }
 }
