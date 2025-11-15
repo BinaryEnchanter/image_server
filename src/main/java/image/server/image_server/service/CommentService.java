@@ -25,6 +25,9 @@ public class CommentService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private ActionLogService actionLogService;
+
     @Transactional
     public Comment addComment(UUID userUuid, UUID wallpaperUuid, String content, Long parentId) {
         userRepository.findById(userUuid).orElseThrow(() -> new RuntimeException("user not found"));
@@ -38,7 +41,10 @@ public class CommentService {
         c.setWallpaperUuid(wallpaperUuid);
         c.setParentId(parentId);
         c.setContent(content);
-        return commentRepository.save(c);
+        Comment saved = commentRepository.save(c);
+        String meta = "{\"comment_id\":" + saved.getId() + (parentId != null ? ",\"parent_id\":" + parentId : "") + "}";
+        actionLogService.log(userUuid, (parentId == null ? "comment_add" : "comment_reply"), wallpaperUuid, meta);
+        return saved;
     }
 
     @Transactional
@@ -46,6 +52,7 @@ public class CommentService {
         Comment c = commentRepository.findById(commentId).orElseThrow(() -> new RuntimeException("comment not found"));
         if (!isAdmin && !c.getUserUuid().equals(actorUuid)) throw new RuntimeException("forbidden");
         commentRepository.delete(c);
+        actionLogService.log(actorUuid, "comment_delete", c.getWallpaperUuid(), "{\"comment_id\":" + commentId + "}");
     }
 
     @Transactional
@@ -70,6 +77,7 @@ public class CommentService {
             if (v == 1) c.setLikeCount(c.getLikeCount() + 1); else c.setDislikeCount(c.getDislikeCount() + 1);
         }
         commentRepository.save(c);
+        actionLogService.log(userUuid, (v == 1 ? "comment_like" : "comment_dislike"), c.getWallpaperUuid(), "{\"comment_id\":" + commentId + "}");
     }
 
     public Page<Comment> list(UUID wallpaperUuid, int page, int size) {
