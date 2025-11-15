@@ -131,6 +131,7 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
 
         // 执行删除（删除文件 + DB 记录）
         wallpaperService.deleteWallpaper(wp);
+        actionLogService.log(userUuid, "cancel_upload", uuid, null);
 
         return ResponseEntity.ok(Map.of("success", true));
     } catch (JwtException jex) {
@@ -216,6 +217,7 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
         System.out.println("JWT: " + jwtToken);
         UUID userUuid = UUID.fromString(jwtUtil.validateAndGetSubject(jwtToken));
         wallpaperService.favorite(userUuid, uuid);
+        actionLogService.log(userUuid, "favorite", uuid, null);
         return ResponseEntity.ok(Map.of("ok", true));
     }
 
@@ -227,6 +229,7 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
         try {
             UUID userUuid = UUID.fromString(jwtUtil.validateAndGetSubject(jwtToken));
             wallpaperService.unfavorite(userUuid, uuid);
+            actionLogService.log(userUuid, "unfavorite", uuid, null);
             return ResponseEntity.ok(Map.of("ok", true));
         } catch (JwtException e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
@@ -251,6 +254,7 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
         UUID userUuid = UUID.fromString(authentication.getName());
         try {
             wallpaperService.purchase(userUuid, uuid);
+            actionLogService.log(userUuid, "purchase", uuid, null);
             return ResponseEntity.ok(Map.of("ok", true));
         } catch (Exception ex) {
             return ResponseEntity.status(400).body(ex.getMessage());
@@ -265,6 +269,7 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
         UUID userUuid = UUID.fromString(authentication.getName());
         try {
             wallpaperService.purchaseImage(userUuid, uuid);
+            actionLogService.log(userUuid, "purchase", uuid, null);
             return ResponseEntity.ok(Map.of("ok", true));
         } catch (RuntimeException ex) {
             return ResponseEntity.status(400).body(Map.of("error", ex.getMessage()));

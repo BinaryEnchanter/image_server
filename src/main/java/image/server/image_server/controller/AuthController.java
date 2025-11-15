@@ -29,6 +29,9 @@ public class AuthController {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private image.server.image_server.service.ActionLogService actionLogService;
+
     /**
      * 简单注册（仅用于测试）。生产需要邮箱校验/验证码/更严格验证。
      */
@@ -36,6 +39,7 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody RegisterDto dto) {
         try {
             User u = userService.register(dto.username, dto.email, dto.password);
+            actionLogService.log(u.getUuid(), "register", null, "{\"username\":\"" + u.getUsername() + "\"}");
             return ResponseEntity.ok(u.getUuid());
         } catch (Exception ex) {
             return ResponseEntity.badRequest().body(ex.getMessage());
@@ -57,6 +61,7 @@ public class AuthController {
             String token = jwtUtil.generateToken(uuid);
             // fetch user for coins/username
             User u = userService.findByUuid(uuid).orElseThrow();
+            actionLogService.log(u.getUuid(), "login", null, null);
             return ResponseEntity.ok(new LoginResponse(token, u.getUuid(), u.getUsername(), u.getCoins()));
         } catch (Exception ex) {
             return ResponseEntity.status(401).body("invalid credentials");
