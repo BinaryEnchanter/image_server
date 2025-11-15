@@ -4,6 +4,8 @@ package image.server.image_server.model;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "user_action_logs")
@@ -22,6 +24,7 @@ public class UserActionLog {
     private UUID targetUuid;
 
     @Column(columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
     private String meta;
 
     @Column(nullable=false)
