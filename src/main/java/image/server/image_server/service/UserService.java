@@ -80,11 +80,43 @@ public class UserService implements UserDetailsService {
     
     public boolean isAdmin(UUID uuid) {
         Optional<User> u = userRepository.findById(uuid);
-        if (u.isPresent()){
+        if (u.isPresent()) {
             return u.get().getRole().equals("admin");
         }
 
         return false;
-        
+
+    }
+    
+     // 编辑用户名
+    public User updateUsername(UUID uuid, String newUsername) {
+        // 用户名是否已被占用
+        if (userRepository.findByUsername(newUsername).isPresent()) {
+            throw new RuntimeException("username exists");
+        }
+
+        User u = userRepository.findById(uuid)
+                .orElseThrow(() -> new RuntimeException("user not found"));
+
+        u.setUsername(newUsername);
+        return userRepository.save(u);
+    }
+
+    // 编辑邮箱
+    public User updateEmail(UUID uuid, String newEmail) {
+        User u = userRepository.findById(uuid)
+                .orElseThrow(() -> new RuntimeException("user not found"));
+
+        u.setEmail(newEmail);
+        return userRepository.save(u);
+    }
+
+    // 编辑密码
+    public User updatePassword(UUID uuid, String newPlainPassword) {
+        User u = userRepository.findById(uuid)
+                .orElseThrow(() -> new RuntimeException("user not found"));
+
+        u.setPasswordHash(passwordEncoder.encode(newPlainPassword));
+        return userRepository.save(u);
     }
 }

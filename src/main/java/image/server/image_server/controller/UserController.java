@@ -11,6 +11,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -64,7 +66,7 @@ public class UserController {
     // 获取当前用户上传的壁纸列表（分页可选）
     @GetMapping("/me/wallpapers")
     public ResponseEntity<?> myWallpapers(@RequestHeader("Authorization") String authHeader,
-                                          @RequestParam(defaultValue = "1") int page) {
+            @RequestParam(defaultValue = "1") int page) {
         try {
             // 从 JWT 获取用户 UUID
             String jwt = authHeader.replace("Bearer ", "");
@@ -75,7 +77,8 @@ public class UserController {
 
             List<WallpaperDto> items = p.getContent().stream().map(w -> {
                 String thumbPath = w.getThumbPath() == null ? "" : w.getThumbPath();
-                if (!thumbPath.startsWith("/")) thumbPath = "/" + thumbPath;
+                if (!thumbPath.startsWith("/"))
+                    thumbPath = "/" + thumbPath;
                 String base = serverBaseUrl.replaceAll("/+$", "");
                 String thumbUrl = base + "/files" + thumbPath;
                 return new WallpaperDto(w.getUuid(), w.getName(), thumbUrl, w.getPaid(), w.getPriceCents());
@@ -84,6 +87,60 @@ public class UserController {
             return ResponseEntity.ok(new PagedResponse<>(page, perPage, p.getTotalElements(), items));
         } catch (Exception e) {
             return ResponseEntity.status(401).body(Map.of("error", "unauthenticated"));
+        }
+    }
+        // -----------------------
+    // 修改用户名
+    // -----------------------
+    @PostMapping("/me/username")
+    public ResponseEntity<?> updateUsername(Authentication authentication,
+                                            @RequestBody Map<String, Object>  body) {
+        if (authentication == null)
+            return ResponseEntity.status(401).body("unauthenticated");
+
+        try {
+            UUID uuid = UUID.fromString(authentication.getName());
+            User updated = userService.updateUsername(uuid, body.get("newUsername").toString());
+            return ResponseEntity.ok(Map.of("message", "username updated", "username", updated.getUsername()));
+        } catch (Exception ex) {
+            return ResponseEntity.status(400).body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    // -----------------------
+    // 修改邮箱
+    // -----------------------
+    @PostMapping("/me/email")
+    public ResponseEntity<?> updateEmail(Authentication authentication,
+                                        @RequestBody Map<String, Object> newEmail) {
+        if (authentication == null)
+            return ResponseEntity.status(401).body("unauthenticated");
+
+        try {
+            UUID uuid = UUID.fromString(authentication.getName());
+            User updated = userService.updateEmail(uuid, newEmail.get("newEmail").toString());
+            return ResponseEntity.ok(Map.of("message", "email updated", "email", updated.getEmail()));
+        } catch (Exception ex) {
+            return ResponseEntity.status(400).body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+
+    // -----------------------
+    // 修改密码
+    // -----------------------
+    @PostMapping("/me/password")
+    public ResponseEntity<?> updatePassword(Authentication authentication,
+                                            @RequestBody Map<String, Object> newPassword) {
+        if (authentication == null)
+            return ResponseEntity.status(401).body("unauthenticated");
+
+        try {
+            UUID uuid = UUID.fromString(authentication.getName());
+            userService.updatePassword(uuid, newPassword.get("newPassword").toString());
+            return ResponseEntity.ok(Map.of("message", "password updated"));
+        } catch (Exception ex) {
+            return ResponseEntity.status(400).body(Map.of("error", ex.getMessage()));
         }
     }
 }
