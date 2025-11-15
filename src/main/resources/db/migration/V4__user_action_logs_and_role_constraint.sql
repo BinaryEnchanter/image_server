@@ -35,3 +35,18 @@ ALTER TABLE purchases
 -- 可选索引，提升查询性能
 CREATE INDEX IF NOT EXISTS idx_purchases_user_wallpaper
   ON purchases (user_uuid, wallpaper_uuid);
+
+ALTER TABLE user_action_logs
+  ADD COLUMN IF NOT EXISTS username TEXT;
+
+UPDATE user_action_logs l
+SET username = u.username
+FROM users u
+WHERE l.user_uuid = u.uuid
+  AND (l.username IS NULL OR l.username = '');
+
+ALTER TABLE user_action_logs
+  ALTER COLUMN username SET NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_user_action_logs_username
+  ON user_action_logs (username);

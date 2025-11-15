@@ -20,6 +20,9 @@ public class UserActionLog {
     @Column(nullable=false)
     private String action;
 
+    @Column(nullable=false)
+    private String username;
+
     @Column
     private UUID targetUuid;
 
@@ -42,5 +45,7 @@ public class UserActionLog {
     public void setTargetUuid(UUID targetUuid) { this.targetUuid = targetUuid; }
     public String getMeta() { return meta; }
     public void setMeta(String meta) { this.meta = meta; }
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
 }

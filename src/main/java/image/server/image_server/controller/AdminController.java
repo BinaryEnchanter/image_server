@@ -44,8 +44,8 @@ public class AdminController {
         }
     }
 
-    @GetMapping("/users/{uuid}/logs")
-    public ResponseEntity<?> userLogs(@PathVariable UUID uuid,
+    @GetMapping("/users/{username}/logs")
+    public ResponseEntity<?> userLogs(@PathVariable String username,
                                       @RequestHeader("Authorization") String authHeader,
                                       @RequestParam(defaultValue = "1") int page,
                                       @RequestParam(defaultValue = "20") int size) {
@@ -53,10 +53,14 @@ public class AdminController {
             String token = authHeader.substring(7);
             UUID adminUuid = UUID.fromString(jwtUtil.validateAndGetSubject(token));
             if (!userService.isAdmin(adminUuid)) return ResponseEntity.status(403).body(Map.of("error", "forbidden"));
-            Page<UserActionLog> p = actionLogService.listByUser(uuid, page - 1, size);
+            Optional<image.server.image_server.model.User> uOpt = userService.findByUsername(username);
+            if (uOpt.isEmpty()) return ResponseEntity.status(404).body(Map.of("error", "user not found"));
+            image.server.image_server.model.User u = uOpt.get();
+            Page<UserActionLog> p = actionLogService.listByUser(u.getUuid(), page - 1, size);
             List<Map<String, Object>> items = p.getContent().stream().map(l -> {
                 Map<String, Object> m = new java.util.LinkedHashMap<>();
                 m.put("id", l.getId());
+                m.put("username", l.getUsername());
                 m.put("action", l.getAction());
                 m.put("target_uuid", l.getTargetUuid());
                 m.put("meta", l.getMeta());
