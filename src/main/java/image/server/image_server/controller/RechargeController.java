@@ -32,6 +32,9 @@ public class RechargeController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private image.server.image_server.service.ActionLogService actionLogService;
+
     /**
      * POST /api/v1/users/me/recharge
      * Body: { "amount": 100, "note": "test", "provider_txn_id": "sim-123" }
@@ -67,6 +70,7 @@ public class RechargeController {
             // get updated user for response
             User u = userRepository.findById(userUuid).orElseThrow();
 
+            actionLogService.log(userUuid, "recharge", null, "{\"txn_id\":" + txn.getId() + ",\"amount\":" + amount + "}");
             return ResponseEntity.ok(Map.of(
                     "ok", true,
                     "txn_id", txn.getId(),

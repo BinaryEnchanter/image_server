@@ -74,6 +74,10 @@ public class UserService implements UserDetailsService {
         return userRepository.findById(uuid);
     }
 
+    public Optional<User> findByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+
     public User save(User u) {
         return userRepository.save(u);
     }
@@ -87,8 +91,23 @@ public class UserService implements UserDetailsService {
         return false;
 
     }
-    
-     // 编辑用户名
+
+    public boolean isBlacklisted(UUID uuid) {
+        Optional<User> u = userRepository.findById(uuid);
+        return u.map(x -> "blacklist".equalsIgnoreCase(x.getRole())).orElse(false);
+    }
+
+    public User updateRole(UUID uuid, String role) {
+        User u = userRepository.findById(uuid).orElseThrow(() -> new RuntimeException("user not found"));
+        String r = role == null ? "" : role.toLowerCase();
+        if (!r.equals("user") && !r.equals("admin") && !r.equals("blacklist")) {
+            throw new RuntimeException("invalid role");
+        }
+        u.setRole(r);
+        return userRepository.save(u);
+    }
+
+      // 编辑用户名
     public User updateUsername(UUID uuid, String newUsername) {
         // 用户名是否已被占用
         if (userRepository.findByUsername(newUsername).isPresent()) {
