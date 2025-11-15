@@ -29,6 +29,7 @@ import image.server.image_server.model.Wallpaper;
 import image.server.image_server.security.JwtUtil;
 import image.server.image_server.service.UserService;
 import image.server.image_server.service.WallpaperService;
+import image.server.image_server.service.ActionLogService;
 import io.jsonwebtoken.JwtException;
 
 /**
@@ -46,6 +47,9 @@ public class WallpaperController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private ActionLogService actionLogService;
 
     @Value("${app.server.base-url:http://47.109.41.86:8080}")
     private String serverBaseUrl;
@@ -151,12 +155,17 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
         }
         System.out.println("JWT: " + jwtToken);
         UUID userUuid = UUID.fromString(jwtUtil.validateAndGetSubject(jwtToken));
+        if (userService.isBlacklisted(userUuid)) {
+            return ResponseEntity.status(403)
+                    .body(Map.of("api", "ans_upload", "yes_or_no", false, "error", "黑名单用户禁止上传"));
+        }
         try {
             Wallpaper wp = wallpaperService.upload(userUuid, file, name, tags,price);
             Map<String, Object> r = new HashMap<>();
             r.put("api", "ans_upload");
             r.put("yes_or_no", true);
             r.put("wallpaper_uuid", wp.getUuid());
+            actionLogService.log(userUuid, "upload", wp.getUuid(), null);
             return ResponseEntity.ok(r);
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -170,9 +179,11 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
         if (authentication == null)
             return ResponseEntity.status(401).body("unauthenticated");
         UUID userUuid = UUID.fromString(authentication.getName());
+        if (userService.isBlacklisted(userUuid)) {
+            return ResponseEntity.status(403).body("黑名单用户禁止下载");
+        }
         Wallpaper wp = wallpaperService.findByUuid(uuid).orElseThrow(() -> new RuntimeException("not found"));
 
-        // 检查购买或是否是上传者
         boolean isowner=wp.getOwnerUuid().equals(userUuid);
         if (!isowner) {
             boolean purchased = wallpaperService.hasPurchased(userUuid, uuid);
@@ -180,15 +191,14 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
                 return ResponseEntity.status(403).body("请先购买此壁纸才能下载");
             }
         }
-        
 
         try {
-            // 增加下载次数
             wallpaperService.handleDownload(userUuid, wp,isowner);
 
             String base = serverBaseUrl.replaceAll("/+$", "");
             String downloadUrl = base + "/files/"
                     + (wp.getStoragePath().startsWith("/") ? wp.getStoragePath().substring(1) : wp.getStoragePath());
+            actionLogService.log(userUuid, "download", uuid, null);
             return ResponseEntity.ok(Map.of("download_url", downloadUrl));
         } catch (Exception ex) {
             return ResponseEntity.status(500).body(ex.getMessage());
