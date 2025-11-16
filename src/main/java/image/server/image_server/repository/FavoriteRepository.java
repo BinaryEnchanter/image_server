@@ -5,8 +5,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.time.OffsetDateTime;
 
 public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
     Optional<Favorite> findByUserUuidAndWallpaperUuid(UUID userUuid, UUID wallpaperUuid);
     long countByWallpaperUuid(UUID wallpaperUuid);
+    long countByCreatedAtBetween(OffsetDateTime start, OffsetDateTime end);
 }
