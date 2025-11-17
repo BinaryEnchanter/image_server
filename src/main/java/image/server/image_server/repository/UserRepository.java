@@ -2,6 +2,7 @@ package image.server.image_server.repository;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.time.OffsetDateTime;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -18,5 +19,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.uuid = :uuid")
     Optional<User> findByUuidForUpdate(UUID uuid);
+
+    long countByCreatedAtBetween(OffsetDateTime start, OffsetDateTime end);
     
 }

@@ -4,6 +4,13 @@ import java.io.IOException;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -305,7 +312,66 @@ public class WallpaperService {
         return purchaseRepository.findByUserUuidAndWallpaperUuid(userUuid, wallpaperUuid).isPresent();
     }
 
-    private boolean reviewImage(MultipartFile file) {
+    public List<Wallpaper> similarByTags(UUID wallpaperUuid, int limit) {
+    Optional<Wallpaper> o = wallpaperRepository.findById(wallpaperUuid);
+    if (o.isEmpty()) return java.util.Collections.emptyList();
+    String ts = o.get().getTags();
+    String[] tags = ts == null ? new String[0] : Arrays.stream(ts.split(",")).map(String::trim).filter(s->!s.isEmpty()).toArray(String[]::new);
+    List<Wallpaper> result = new ArrayList<>();
+    LinkedHashSet<UUID> seen = new LinkedHashSet<>();
+    for (String tag : tags) {
+        if (result.size() >= limit) break;
+        Page<Wallpaper> p = wallpaperRepository.findByVisibilityAndTagsContainingIgnoreCaseAndUuidNot(
+                "public", tag, wallpaperUuid,
+                PageRequest.of(0, Math.max(1, limit - result.size()), Sort.by(Sort.Direction.DESC, "favoriteCount", "downloadCount", "createdAt"))
+        );
+        for (Wallpaper w : p.getContent()) {
+            if (seen.add(w.getUuid())) {
+                result.add(w);
+                if (result.size() >= limit) break;
+            }
+        }
+    }
+    return result;
+}
+
+public List<Wallpaper> recommendForUser(UUID userUuid, int limit) {
+    List<Favorite> favs = favoriteRepository.findTop100ByUserUuidOrderByCreatedAtDesc(userUuid);
+    Map<String,Integer> tagCount = new HashMap<>();
+    for (Favorite f : favs) {
+        wallpaperRepository.findById(f.getWallpaperUuid()).ifPresent(w -> {
+            String ts = w.getTags();
+            if (ts != null && !ts.isBlank()) {
+                Arrays.stream(ts.split(",")).map(String::trim).filter(s->!s.isEmpty()).forEach(t -> {
+                    tagCount.put(t, tagCount.getOrDefault(t, 0) + 1);
+                });
+            }
+        });
+    }
+    List<String> topTags = tagCount.entrySet().stream()
+            .sorted((a,b)->Integer.compare(b.getValue(), a.getValue()))
+            .map(Map.Entry::getKey)
+            .limit(5)
+            .collect(Collectors.toList());
+    List<Wallpaper> result = new ArrayList<>();
+    LinkedHashSet<UUID> seen = new LinkedHashSet<>();
+    for (String tag : topTags) {
+        if (result.size() >= limit) break;
+        Page<Wallpaper> p = wallpaperRepository.findByVisibilityAndTagsContainingIgnoreCase(
+                "public", tag,
+                PageRequest.of(0, Math.max(1, limit - result.size()), Sort.by(Sort.Direction.DESC, "favoriteCount", "downloadCount", "createdAt"))
+        );
+        for (Wallpaper w : p.getContent()) {
+            if (seen.add(w.getUuid())) {
+                result.add(w);
+                if (result.size() >= limit) break;
+            }
+        }
+    }
+    return result;
+}
+
+private boolean reviewImage(MultipartFile file) {
         if (!moderationEnabled || moderationUrl == null || moderationUrl.isBlank()) return true;
         long size = file.getSize();
         if (size < 5 * 1024 || size > 4 * 1024 * 1024) return false;
