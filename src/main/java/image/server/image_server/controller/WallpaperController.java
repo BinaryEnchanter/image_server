@@ -181,9 +181,13 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
             r.put("wallpaper_uuid", wp.getUuid());
             actionLogService.log(userUuid, "upload", wp.getUuid(), null);
             return ResponseEntity.ok(r);
+        } catch (org.springframework.web.server.ResponseStatusException ex) {
+            return ResponseEntity.status(ex.getStatusCode())
+                    .body(Map.of("api", "ans_upload", "yes_or_no", false, "error", ex.getReason()));
         } catch (Exception ex) {
             ex.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("api", "ans_upload", "yes_or_no", false, "error", ex.getMessage()));
+            return ResponseEntity.status(500)
+                    .body(Map.of("api", "ans_upload", "yes_or_no", false, "error", "上传失败，请稍后重试"));
         }
     }
 

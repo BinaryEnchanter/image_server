@@ -75,7 +75,7 @@ public class WallpaperService {
     @Value("${app.moderation.check-url:}")
     private String moderationUrl;
 
-    @Value("${app.moderation.api-key:}")
+    @Value("${app.moderation.api-key:${app.moderation.access-token:}}")
     private String moderationApiKey;
 
     /**
@@ -117,7 +117,9 @@ public class WallpaperService {
             up.setStatus("failed");
             up.setErrorMsg("rejected by moderation");
             uploadRepository.save(up);
-            throw new IOException("图片未通过内容安全审核");
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "图片未通过内容安全审核");
         }
 
         Wallpaper wp = new Wallpaper();
@@ -376,7 +378,10 @@ private boolean reviewImage(MultipartFile file) {
             RestTemplate rt = restTemplateBuilder.build();
             String url = moderationUrl;
             if (!url.contains("access_token")) {
-                if (moderationApiKey == null || moderationApiKey.isBlank()) return false;
+                if (moderationApiKey == null || moderationApiKey.isBlank()) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "审核配置缺失");
+                }
                 url = url + (url.contains("?") ? "&" : "?") + "access_token=" + moderationApiKey;
             }
             HttpHeaders headers = new HttpHeaders();
@@ -394,9 +399,11 @@ private boolean reviewImage(MultipartFile file) {
                 JsonNode t = root.path("conclusionType");
                 return t.isInt() && t.asInt() == 1;
             }
-            return false;
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_GATEWAY, "审核服务异常");
         } catch (Exception ex) {
-            return false;
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_GATEWAY, "审核服务异常");
         }
     }
 }
