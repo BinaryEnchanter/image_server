@@ -3,6 +3,8 @@ package image.server.image_server.service;
 import image.server.image_server.config.LlmProperties;
 import image.server.image_server.model.ChatMessage;
 import image.server.image_server.repository.ChatMessageRepository;
+import image.server.image_server.service.UserService;
+import image.server.image_server.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,9 @@ public class LlmService {
 
     @Autowired
     private ChatMessageRepository chatRepo;
+
+    @Autowired
+    private UserService userService;
 
     // 注入 DoubaoProvider by name
     @Autowired
@@ -34,6 +39,18 @@ public class LlmService {
         // system
         if (props.getSystemPrompt() != null && !props.getSystemPrompt().isBlank()) {
             messages.add(Map.of("role", "system", "content", props.getSystemPrompt()));
+        }
+        if (userUuid != null) {
+            Optional<User> uOpt = userService.findByUuid(userUuid);
+            if (uOpt.isPresent()) {
+                User u = uOpt.get();
+                String profile = "用户信息：uuid=" + u.getUuid()
+                        + "；用户名=" + u.getUsername()
+                        + "；邮箱=" + (u.getEmail() == null ? "" : u.getEmail())
+                        + "；角色=" + u.getRole()
+                        + "；金币=" + (u.getCoins() == null ? 0L : u.getCoins());
+                messages.add(Map.of("role", "system", "content", profile));
+            }
         }
 
         // history

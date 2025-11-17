@@ -45,6 +45,7 @@ public class SecurityConfig {
                 // 允许预检 OPTIONS 所有通过
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/v1/auth/**", "/files/**", "/actuator/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/wallpapers", "/api/v1/wallpapers/search").permitAll()
                 .anyRequest().authenticated()
             )
             .httpBasic(Customizer.withDefaults());

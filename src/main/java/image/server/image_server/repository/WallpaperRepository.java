@@ -1,7 +1,7 @@
 package image.server.image_server.repository;
 
-import java.util.UUID;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,4 +25,8 @@ public interface WallpaperRepository extends JpaRepository<Wallpaper, UUID> {
 
     @org.springframework.data.jpa.repository.Query("select coalesce(sum(w.downloadCount),0) from Wallpaper w")
     Long totalDownloads();
+
+    Page<Wallpaper> findByVisibilityAndTagsContainingIgnoreCaseAndUuidNot(String visibility, String tags, UUID uuid, Pageable pageable);
+
+    Page<Wallpaper> findByVisibilityAndTagsContainingIgnoreCase(String visibility, String tags, Pageable pageable);
 }

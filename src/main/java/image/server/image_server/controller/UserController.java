@@ -89,6 +89,26 @@ public class UserController {
             return ResponseEntity.status(401).body(Map.of("error", "unauthenticated"));
         }
     }
+
+    @GetMapping("/me/recommendations")
+    public ResponseEntity<?> myRecommendations(@RequestHeader("Authorization") String authHeader,
+                                               @RequestParam(defaultValue = "12") int size) {
+        try {
+            String jwt = authHeader.replace("Bearer ", "");
+            UUID userUuid = UUID.fromString(jwtUtil.validateAndGetSubject(jwt));
+            List<Wallpaper> ws = wallpaperService.recommendForUser(userUuid, Math.max(1, size));
+            String base = serverBaseUrl.replaceAll("/+$", "");
+            List<WallpaperDto> items = ws.stream().map(w -> {
+                String thumbPath = w.getThumbPath() == null ? "" : w.getThumbPath();
+                if (!thumbPath.startsWith("/")) thumbPath = "/" + thumbPath;
+                String thumbUrl = base + "/files" + thumbPath;
+                return new WallpaperDto(w.getUuid(), w.getName(), thumbUrl, w.getPaid(), w.getPriceCents());
+            }).collect(Collectors.toList());
+            return ResponseEntity.ok(items);
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(Map.of("error", "unauthenticated"));
+        }
+    }
         // -----------------------
     // 修改用户名
     // -----------------------

@@ -37,7 +37,7 @@ app:
   moderation:
     enabled: true
     check-url: https://aip.baidubce.com/rest/2.0/solution/v1/img_censor/v2/user_defined
-    access-token: null
+    access-token: 24.71e2fd082a7bd5ee0e8edbaba7a4e2eb.2592000.1765701643.282335-120828100
 
 logging:
   level:
@@ -46,13 +46,20 @@ logging:
 
 llm:
   base-url: https://ark.cn-beijing.volces.com # 豆包示例域名
-  api-key: null # 请替换为你的 key
+  api-key: ff6e8532-fb49-46f2-aa80-7b6f0ada6be1 # 请替换为你的 key
   model: doubao-seed-1-6-251015
   use-history: true
   history-window: 20
   system-prompt: |
-    你是“壁纸中心”的智能客服，熟悉上传/下载/购买/金币/撤回上传/账户管理与常见问题。
+    你是“壁纸中心”的智能客服，熟悉上传/下载/购买/金币/撤回上传/账户管理与常见问题。前端功能总结
+    导航与路由：使用 vue-router 提供 首页 、 壁纸列表 、 登录/注册 、  上传 、 充值 、 个人中心 、 管理后台 等页面入口，顶栏根据登录状态显示不 同操作。
+    壁纸浏览与搜索：在 首页 和 壁纸列表 支持搜索、分页浏览、热门推荐， 卡片展示缩略图、标题、收藏数。
+    壁纸详情：查看大图、作者信息、购买与下载、收藏/取消收藏、评论与回复、点赞/点踩、作品撤回等交互。
+    用户账户：登录、注册、个人资料查看与编辑（用户名、邮箱、密码），查 看自己上传或拥有的壁纸。 
+    值与购买：显示金币余额、充值入口、购买付费壁纸、购买状态校验。   
+    上传管理：上传壁纸文件，后端返回处理状态；错误与进度在页面提示。   
+    管理后台：统计总览（壁纸数量、上传通过/失败、下载/收藏数、收入等） ，用户角色设置、日志查看。
   rate-limit-per-minute: 30
 
 doubao:
-  api-key: null
+  api-key: ff6e8532-fb49-46f2-aa80-7b6f0ada6be1

@@ -108,7 +108,19 @@ public class WallpaperController {
         resp.put("favorite", isFavoriteByCurUser);
         return ResponseEntity.ok(resp);
     }
-    
+
+    @GetMapping("/{uuid}/similar")
+    public ResponseEntity<?> similar(@PathVariable UUID uuid, @RequestParam(defaultValue = "4") int size) {
+        List<Wallpaper> items = wallpaperService.similarByTags(uuid, Math.max(1, size));
+        String base = serverBaseUrl.replaceAll("/+$", "");
+        List<WallpaperDto> respItems = items.stream().map(w -> {
+            String thumbPath = w.getThumbPath() == null ? "" : w.getThumbPath();
+            if (!thumbPath.startsWith("/")) thumbPath = "/" + thumbPath;
+            String thumbUrl = base + "/files" + thumbPath;
+            return new WallpaperDto(w.getUuid(), w.getName(), thumbUrl, w.getPaid(), w.getPriceCents());
+        }).collect(Collectors.toList());
+        return ResponseEntity.ok(respItems);
+    }
     
     @DeleteMapping("/{uuid}")
 public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
@@ -285,9 +297,13 @@ public ResponseEntity<?> deleteWallpaper(@PathVariable UUID uuid,
     public ResponseEntity<?> search(@RequestParam String q, @RequestParam(defaultValue = "1") int page) {
         int perPage = 9;
         Page<Wallpaper> p = wallpaperService.search(q, Math.max(0, page - 1), perPage);
-        List<WallpaperDto> items = p.getContent().stream().map(w ->
-                new WallpaperDto(w.getUuid(), w.getName(), "http://47.109.41.86:8080/files/" + w.getThumbPath(), w.getPaid(), w.getPriceCents())
-        ).collect(Collectors.toList());
+        String base = serverBaseUrl.replaceAll("/+$", "");
+        List<WallpaperDto> items = p.getContent().stream().map(w -> {
+            String thumbPath = w.getThumbPath() == null ? "" : w.getThumbPath();
+            if (!thumbPath.startsWith("/")) thumbPath = "/" + thumbPath;
+            String thumbUrl = base + "/files" + thumbPath;
+            return new WallpaperDto(w.getUuid(), w.getName(), thumbUrl, w.getPaid(), w.getPriceCents());
+        }).collect(Collectors.toList());
         return ResponseEntity.ok(new PagedResponse<>(page, perPage, p.getTotalElements(), items));
     }
 }
