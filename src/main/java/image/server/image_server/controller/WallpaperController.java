@@ -21,16 +21,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import java.time.*;
 
 import image.server.image_server.controller.dto.PagedResponse;
 import image.server.image_server.controller.dto.WallpaperDto;
 import image.server.image_server.model.User;
 import image.server.image_server.model.Wallpaper;
 import image.server.image_server.security.JwtUtil;
+import image.server.image_server.service.ActionLogService;
 import image.server.image_server.service.UserService;
 import image.server.image_server.service.WallpaperService;
-import image.server.image_server.service.ActionLogService;
 import io.jsonwebtoken.JwtException;
 
 /**
@@ -52,7 +51,7 @@ public class WallpaperController {
     @Autowired
     private ActionLogService actionLogService;
 
-    @Value("${app.server.base-url:http://47.109.41.86:8080}")
+    @Value("${app.server.base-url:http://118.178.195.70:8080}")
     private String serverBaseUrl;
     // 列表（分页，每页9条）
     @GetMapping
