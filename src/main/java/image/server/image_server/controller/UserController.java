@@ -60,7 +60,7 @@ public class UserController {
     @Autowired
     private JwtUtil jwtUtil;
 
-    @Value("${app.server.base-url:http://47.109.41.86:8080}")
+    @Value("${app.server.base-url:http://118.178.195.70:8080}")
     private String serverBaseUrl;
 
     // 获取当前用户上传的壁纸列表（分页可选）
