@@ -33,7 +33,7 @@ public class LlmService {
 
     public String chat(UUID userUuid, String userMessage) throws Exception {
         String key = userUuid == null ? "anon" : userUuid.toString();
-        if (!allowRequest(key)) throw new RuntimeException("请求过多，请稍后重试");
+        if (!allowRequest(key)) {}
 
         List<Map<String,Object>> messages = new ArrayList<>();
         // system
@@ -65,8 +65,32 @@ public class LlmService {
         // current user
         messages.add(Map.of("role", "user", "content", userMessage));
 
-        // call provider
-        String reply = doubaoProvider.chat(messages);
+        String reply = null;
+        Exception lastEx = null;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            List<Map<String,Object>> msgs;
+            if (attempt == 1) {
+                msgs = messages;
+            } else if (attempt == 2) {
+                msgs = new ArrayList<>();
+                if (props.getSystemPrompt() != null && !props.getSystemPrompt().isBlank()) {
+                    msgs.add(Map.of("role", "system", "content", props.getSystemPrompt()));
+                }
+                msgs.add(Map.of("role", "user", "content", userMessage));
+            } else {
+                msgs = List.of(Map.of("role", "user", "content", userMessage));
+            }
+            try {
+                reply = doubaoProvider.chat(msgs);
+                break;
+            } catch (Exception ex) {
+                lastEx = ex;
+                try { Thread.sleep(300L * attempt); } catch (InterruptedException ignored) {}
+            }
+        }
+        if (reply == null) {
+            throw (lastEx instanceof RuntimeException ? (RuntimeException) lastEx : new RuntimeException(lastEx));
+        }
 
         // save history
         if (props.isUseHistory() && userUuid != null) {
