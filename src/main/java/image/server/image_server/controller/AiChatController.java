@@ -23,10 +23,21 @@ public class AiChatController {
     @PostMapping("/chat")
     public ResponseEntity<?> chat(Authentication authentication,
             @RequestBody Map<String, Object> body,
-            @RequestParam(value = "message", required = false) String messageParam) {
-        if (authentication == null)
-            return ResponseEntity.status(401).body("unauthenticated");
-        UUID userUuid = UUID.fromString(authentication.getName());
+            @RequestParam(value = "message", required = false) String messageParam,
+            @RequestParam(value = "jwt", required = false) String jwtParam,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+
+        UUID userUuid = null;
+        try {
+            if (authentication != null) {
+                userUuid = UUID.fromString(authentication.getName());
+            } else if (jwtParam != null && !jwtParam.isBlank()) {
+                userUuid = UUID.fromString(jwtUtil.validateAndGetSubject(jwtParam));
+            } else if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                String token = authHeader.substring(7);
+                userUuid = UUID.fromString(jwtUtil.validateAndGetSubject(token));
+            }
+        } catch (Exception ignored) {}
 
         String userMessage = null;
         if (messageParam != null && !messageParam.isBlank()) {
