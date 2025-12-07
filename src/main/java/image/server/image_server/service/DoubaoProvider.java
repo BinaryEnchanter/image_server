@@ -46,8 +46,8 @@ public class DoubaoProvider implements LlmProvider {
         this.restTemplate = builder
             .requestFactory(() -> {
                 var factory = new SimpleClientHttpRequestFactory();
-                factory.setConnectTimeout((int) Duration.ofSeconds(3).toMillis());
-                factory.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
+                factory.setConnectTimeout((int) Duration.ofSeconds(5).toMillis());
+                factory.setReadTimeout((int) Duration.ofSeconds(45).toMillis());
                 return factory;
             })
             .build();
@@ -62,12 +62,12 @@ public class DoubaoProvider implements LlmProvider {
             throw new IllegalStateException("LLM configuration (baseUrl/apiKey/model) is not set for DoubaoProvider");
         }
 
-        String url = props.getBaseUrl().replaceAll("/+$", "") + endpointPath;
+        String url = (props.getBaseUrl() == null ? "" : props.getBaseUrl().trim()).replaceAll("/+$", "") + endpointPath;
         log.debug("DoubaoProvider calling URL: {}", url);
 
         // Build request body following Doubao sample format
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", props.getModel());
+        requestBody.put("model", props.getModel() == null ? null : props.getModel().trim());
         requestBody.put("max_completion_tokens", 1024);
         requestBody.put("reasoning_effort", "medium");
 
@@ -93,27 +93,34 @@ public class DoubaoProvider implements LlmProvider {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(props.getApiKey());
+        headers.setBearerAuth(props.getApiKey() == null ? null : props.getApiKey().trim());
 
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
-        ResponseEntity<Map<String, Object>> respEntity;
-        try {
-            respEntity = restTemplate.exchange(
-                    url,
-                    HttpMethod.POST,
-                    entity,
-                    new ParameterizedTypeReference<Map<String, Object>>() {}
-            );
-        } catch (RestClientException rex) {
-            log.error("Failed to call Doubao endpoint", rex);
-            String hint = rex.getMessage();
-            throw new RuntimeException("调用 Doubao 接口失败: " + (hint == null ? "unknown" : hint), rex);
+        ResponseEntity<Map<String, Object>> respEntity = null;
+        int attempts = 0;
+        while (attempts < 3) {
+            attempts++;
+            try {
+                respEntity = restTemplate.exchange(
+                        url,
+                        HttpMethod.POST,
+                        entity,
+                        new ParameterizedTypeReference<Map<String, Object>>() {}
+                );
+                if (respEntity.getStatusCode() == HttpStatus.OK || respEntity.getStatusCode() == HttpStatus.CREATED) {
+                    break;
+                }
+            } catch (RestClientException rex) {
+                if (attempts >= 3) {
+                    String hint = rex.getMessage();
+                    throw new RuntimeException("调用 Doubao 接口失败: " + (hint == null ? "unknown" : hint), rex);
+                }
+            }
+            try { Thread.sleep(400L * attempts); } catch (InterruptedException ignored) {}
         }
-
-        if (respEntity.getStatusCode() != HttpStatus.OK && respEntity.getStatusCode() != HttpStatus.CREATED) {
-            String statusMsg = "Doubao returned non-OK status: " + respEntity.getStatusCode();
-            log.error(statusMsg);
+        if (respEntity == null || (respEntity.getStatusCode() != HttpStatus.OK && respEntity.getStatusCode() != HttpStatus.CREATED)) {
+            String statusMsg = "Doubao returned non-OK status: " + (respEntity == null ? "null" : respEntity.getStatusCode());
             throw new RuntimeException(statusMsg);
         }
 
