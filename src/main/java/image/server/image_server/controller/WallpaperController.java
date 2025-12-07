@@ -66,7 +66,7 @@ public class WallpaperController {
             String base = serverBaseUrl.replaceAll("/+$", "");
             String thumbUrl = base + "/files" + thumbPath; // 如果你希望用 /files/ + w.getThumbPath()
             // 注意：如果你之前把 thumbPath 存为 "wallpapers/uuid/thumb.jpg", result => http://host:port/files/wallpapers/uuid/thumb.jpg
-            return new WallpaperDto(w.getUuid(), w.getName(), thumbUrl, w.getPaid(), w.getPriceCents());
+            return new WallpaperDto(w.getUuid(), w.getName(), thumbUrl, w.getPaid(), w.getPriceCents(), w.getFavoriteCount(), w.getDownloadCount());
         }).collect(Collectors.toList());
 
         return ResponseEntity.ok(new PagedResponse<>(page, perPage, p.getTotalElements(), items));
@@ -116,7 +116,7 @@ public class WallpaperController {
             String thumbPath = w.getThumbPath() == null ? "" : w.getThumbPath();
             if (!thumbPath.startsWith("/")) thumbPath = "/" + thumbPath;
             String thumbUrl = base + "/files" + thumbPath;
-            return new WallpaperDto(w.getUuid(), w.getName(), thumbUrl, w.getPaid(), w.getPriceCents());
+            return new WallpaperDto(w.getUuid(), w.getName(), thumbUrl, w.getPaid(), w.getPriceCents(), w.getFavoriteCount(), w.getDownloadCount());
         }).collect(Collectors.toList());
         return ResponseEntity.ok(respItems);
     }
