@@ -46,8 +46,8 @@ public class DoubaoProvider implements LlmProvider {
         this.restTemplate = builder
             .requestFactory(() -> {
                 var factory = new SimpleClientHttpRequestFactory();
-                factory.setConnectTimeout((int) Duration.ofSeconds(5).toMillis());
-                factory.setReadTimeout((int) Duration.ofSeconds(60).toMillis());
+                factory.setConnectTimeout((int) Duration.ofSeconds(3).toMillis());
+                factory.setReadTimeout((int) Duration.ofSeconds(10).toMillis());
                 return factory;
             })
             .build();
@@ -107,7 +107,8 @@ public class DoubaoProvider implements LlmProvider {
             );
         } catch (RestClientException rex) {
             log.error("Failed to call Doubao endpoint", rex);
-            throw new RuntimeException("调用 Doubao 接口失败: " + rex.getMessage(), rex);
+            String hint = rex.getMessage();
+            throw new RuntimeException("调用 Doubao 接口失败: " + (hint == null ? "unknown" : hint), rex);
         }
 
         if (respEntity.getStatusCode() != HttpStatus.OK && respEntity.getStatusCode() != HttpStatus.CREATED) {
