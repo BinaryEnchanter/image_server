@@ -1,7 +1,7 @@
 package image.server.image_server.controller.dto;
 
 import java.util.UUID;
-import com.fasterxml.jackson.annotation.JsonProperty;
+
 
 /**
  * 简单的 Wallpaper DTO：用于列表/详情（包含 URL path）
@@ -12,9 +12,7 @@ public class WallpaperDto {
     private String thumbUrl;
     private boolean paid;
     private int priceCents;
-    @JsonProperty("favorite_count")
     private Long favoriteCount;
-    @JsonProperty("download_count")
     private Long downloadCount;
 
     public WallpaperDto(UUID uuid, String name, String thumbUrl, boolean paid, int priceCents) {
