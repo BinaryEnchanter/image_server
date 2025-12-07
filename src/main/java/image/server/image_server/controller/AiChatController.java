@@ -22,16 +22,36 @@ public class AiChatController {
 
     @PostMapping("/chat")
     public ResponseEntity<?> chat(Authentication authentication,
-            @RequestBody Map<String, String> body) {
-        
-         if (authentication == null)
+            @RequestBody Map<String, Object> body,
+            @RequestParam(value = "message", required = false) String messageParam) {
+        if (authentication == null)
             return ResponseEntity.status(401).body("unauthenticated");
         UUID userUuid = UUID.fromString(authentication.getName());
-                
-        String userMessage = body.get("message");
-        if (userMessage == null || userMessage.isBlank())
-            return ResponseEntity.badRequest().body(Map.of("error", "ai：不能发送空信息"));
-                                    
+
+        String userMessage = null;
+        if (messageParam != null && !messageParam.isBlank()) {
+            userMessage = messageParam;
+        } else if (body != null) {
+            String[] keys = new String[]{"message","msg","text","content","prompt","q"};
+            for (String k : keys) {
+                Object v = body.get(k);
+                if (v != null) {
+                    String s = v.toString().trim();
+                    if (!s.isEmpty()) { userMessage = s; break; }
+                }
+            }
+            if (userMessage == null) {
+                for (Object v : body.values()) {
+                    if (v != null) {
+                        String s = v.toString().trim();
+                        if (!s.isEmpty()) { userMessage = s; break; }
+                    }
+                }
+            }
+        }
+        if (userMessage == null || userMessage.trim().isEmpty()) {
+            userMessage = " ";
+        }
 
         try {
             String reply = llmService.chat(userUuid, userMessage);
