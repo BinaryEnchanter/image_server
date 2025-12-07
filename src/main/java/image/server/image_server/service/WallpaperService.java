@@ -1,15 +1,15 @@
 package image.server.image_server.service;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.HashMap;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -115,6 +115,15 @@ public class WallpaperService {
         up.setOriginalFilename(file.getOriginalFilename());
         up.setStatus("processing");
         uploadRepository.save(up);
+
+        if (file.getSize()>10*1024*1024||file.getSize()<5*1024){
+            up.setStatus("failed");
+            up.setErrorMsg("rejected by size check");
+            uploadRepository.save(up);
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "请确保图片大小在5KB到10MB之间");
+        }
 
         if (!reviewImage(file)) {
             up.setStatus("failed");
@@ -376,7 +385,7 @@ public List<Wallpaper> recommendForUser(UUID userUuid, int limit) {
 private boolean reviewImage(MultipartFile file) {
         if (!moderationEnabled || moderationUrl == null || moderationUrl.isBlank()) return true;
         long size = file.getSize();
-        if (size < 5 * 1024 || size > 4 * 1024 * 1024) return false;
+        if (size < 5 * 1024 || size > 10 * 1024 * 1024) return false;
         try {
             RestTemplate rt = restTemplateBuilder.build();
             String url = moderationUrl;
